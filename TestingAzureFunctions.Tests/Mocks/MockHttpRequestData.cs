@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Claims;
+using System.Text;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Moq;
@@ -10,16 +11,20 @@ namespace TestingAzureFunctions.Tests.Mocks;
 
 public sealed class MockHttpRequestData : HttpRequestData
 {
+    // No behaviour is actually needed from this.
     private static readonly FunctionContext Context = Mock.Of<FunctionContext>();
     
-    public MockHttpRequestData(Stream body) : base(Context)
+    public MockHttpRequestData(string body) : base(Context)
     {
-        this.Body = body;
+        // I added the body parameter just to clean up boilerplate.
+        var bytes = Encoding.UTF8.GetBytes(body);
+        Body = new MemoryStream(bytes);
     }
 
     public override HttpResponseData CreateResponse()
     {
-        throw new NotImplementedException();
+        // The actual response creation is done via extension methods
+        return new MockHttpResponseData(Context);
     }
 
     public override Stream Body { get; }
