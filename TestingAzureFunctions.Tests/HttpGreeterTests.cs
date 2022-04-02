@@ -1,33 +1,44 @@
-using System.IO;
 using System.Net;
 using System.Threading.Tasks;
+using Shouldly;
+using TestingAzureFunctions.Tests.Extensions;
 using TestingAzureFunctions.Tests.Mocks;
 using Xunit;
 
 namespace TestingAzureFunctions.Tests;
 
-public class HttpGreeterTests : IClassFixture<HttpFunction>
+public class HttpGreeterTests : IClassFixture<GreeterHttpFunction>
 {
-    private readonly HttpFunction _sut;
+    private readonly GreeterHttpFunction _sut;
 
-    public HttpGreeterTests(HttpFunction sut)
+    public HttpGreeterTests(GreeterHttpFunction sut)
     {
         _sut = sut;
     }
-    
-    [Fact]
-    public async Task InvalidJsonReturnsBadRequest()
+
+    [Theory]
+    [InlineData("{invalid}")]
+    [InlineData("{'name': ''}")]
+    [InlineData("")]
+    public async Task InvalidRequestBodyReturnsBadRequest(string body)
     {
-        var request = new MockHttpRequestData(await GetBodyStream("{invalid}"));
-        var response = await TestingAzureFunctions.Program.Greet(request);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var request = new MockHttpRequestData(body);
+        var response = await _sut.Greet(request);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
-    
-    private static async Task<Stream> GetBodyStream(string json)
+
+    [Theory]
+    [InlineData("John Wick")]
+    [InlineData("Bryan Mills")]
+    [InlineData("Katniss Eberdeen")]
+    public async Task ValidRequestBodyReturnsOkWithMessage(string name)
     {
-        var stream = new MemoryStream();
-        await using var writer = new StreamWriter(stream);
-        await writer.WriteAsync(json);
-        return stream;
+        var request = new MockHttpRequestData($"{{ 'name': '{name}' }}");
+        var response = await _sut.Greet(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var message = await response.GetResponseBody();
+        message.ShouldBe($"Hello, {name}!");
     }
 }
